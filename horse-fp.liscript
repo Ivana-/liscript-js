@@ -1,0 +1,36 @@
+(defn knight (m n) do
+    (defn exist-step (a b c)
+        (cond (null? c) false
+              (and (eq? a (car c)) (eq? b (cadr c))) true
+              (exist-step a b (cdr c))))
+
+    (defn next-pos (c) do
+        (def p (car c))
+        (def s (filter (lambda (x) (and (<= 1 (car x) m) (<= 1 (cadr x) n)))
+            (map (lambda (x) (cons (+ (car p) (car x)) (+ (cadr p) (cadr x))))
+                 '((2 1) (1 2) (-1 2) (-2 1) (-2 -1) (-1 -2) (1 -2) (2 -1)) )))
+        (filter (lambda (x) (not (exist-step x p c))) s) )
+
+    (defn next-chains (c) (map (lambda (x) (cons x c)) (next-pos c) ))
+
+    (def field-ps (concat (map (lambda (x) (map (lambda (y) (cons x y))
+                               (list-from-to 1 n))) (list-from-to 1 m))))
+    (defn full-chain (c)
+        (and (eq? (car c) '(1 1)) (null? (filter (lambda (x) (not (elem x c))) field-ps))))
+
+    (defn go (c) do
+        (def n-c (next-chains c))
+        (cond (full-chain c) c
+              (null? n-c) nil
+              (foldl (lambda (x a) (cond (null? a) (go x) a)) nil n-c) ))
+
+    (go '((1 1)) ))
+
+
+(defn range-acc (from to acc)
+  (cond (>= from to) acc
+        (range-acc from (- to 1) (cons (- to 1) acc))))
+
+(defn range (from to) (range-acc from to nil))
+
+(map (lambda (n) (print "Для поля " n "*" n ": " (knight n n) \n)) (range 1 9))

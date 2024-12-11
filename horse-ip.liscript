@@ -1,0 +1,117 @@
+(defn range-acc (from to acc)
+  (cond (>= from to) acc
+        (range-acc from (- to 1) (cons (- to 1) acc))))
+
+(defn range (from to) (range-acc from to nil))
+
+(def zip-with zipwith)
+
+(defn knight (max-x max-y x0 y0) do
+  (def p0 (id x0 y0))
+  ; (def deltas '((1 2) (1 -2) (-1 2) (-1 -2) (2 1) (2 -1) (-2 1) (-2 -1))) ;
+  (def deltas '((2 1) (1 2) (-1 2) (-2 1) (-2 -1) (-1 -2) (1 -2) (2 -1)))
+
+  (defn in-field? (p) (and (<= 1 (car p) max-x) (<= 1 (car (cdr p)) max-y)))
+
+  (defn moves-from (p) (filter in-field? (map (lambda (d) (zip-with + p d)) deltas)))
+
+  (def all-cells
+    (concat
+      (map (lambda (x)
+              (map (lambda (y) (id x y)) (range 1 (+ max-y 1))))
+           (range 1 (+ max-x 1)))))
+
+  (defn step->symbol (step) (symbol (++ step)))
+
+  (def all-steps
+    (concat
+     (map (lambda (cell) (map (lambda (next) (id cell next)) (moves-from cell)))
+          all-cells)))
+
+  (def step-defs
+    (map (lambda (step) (id 'def (step->symbol step) false))
+         all-steps))
+
+  (defn mk-steps-set () do
+    (eval (cons 'do step-defs))
+    (defn get (from to)
+      (eval (step->symbol (id from to))))
+    (defn set (from to value)
+      (eval (id 'set! (step->symbol (id from to)) value)))
+    (defn add (from to)
+      (set from to true))
+    (defn remove (from to)
+      (set from to false))
+    (defn dispatch (cmd)
+      (cond
+        (= cmd 'get) get
+        (= cmd 'add) add
+        (= cmd 'remove) remove))
+    dispatch)
+
+  (defn point->symbol (point) (symbol (++ point)))
+
+  (def point-defs
+    (map (lambda (point) (id 'def (point->symbol point) 0))
+         all-cells))
+
+  (defn mk-points-mset () do
+      (eval (cons 'do point-defs))
+      (def total 0)
+      (def distinct 0)
+      (defn update (fn point) do
+          (def name (point->symbol point))
+          (def count (eval name))
+          (def new-count (fn count))
+          (cond
+              (and (= count 0) (/= new-count 0))
+                  (set! distinct (+ distinct 1))
+              (and (= new-count 0) (/= count 0))
+                  (set! distinct (- distinct 1)))
+          (set! total (+ total (- new-count count)))
+          (eval (id 'set! name new-count))
+      )
+      (defn add    (point) (update (lambda (n) (+ n 1)) point))
+      (defn remove (point) (update (lambda (n) (- n 1)) point))
+      (defn dispatch (cmd)
+        (cond
+          (= cmd 'add) add
+          (= cmd 'remove) remove
+          (= cmd 'distinct) distinct
+          (= cmd 'total) total))
+      dispatch)
+
+
+  (def steps (mk-steps-set))
+  (def points (mk-points-mset))
+
+  (defn all-is-good? (path)
+    (and
+     (= (car path) p0)
+     (= (points 'distinct) (* max-x max-y))))
+
+  (defn search (path move-queue)
+    (cond
+      (nil? move-queue) false
+      (all-is-good? path) path
+      (nil? (car move-queue)) (do
+                                (cond (not (nil? (cdr path)))
+                                      (do
+                                        ((steps 'remove) (car (cdr path)) (car path))
+                                        ((points 'remove) (car path))))
+                                (search (cdr path) (cdr move-queue)))
+      (do
+        (def from (car path))
+        (def to (car (car move-queue)))
+        (def new-queue (cons (cdr (car move-queue)) (cdr move-queue)))
+        (cond ((steps 'get) from to)
+              (search path new-queue)
+              (do
+                ((steps 'add) from to)
+                ((points 'add) to)
+                (search (cons to path) (cons (moves-from to) new-queue)))))))
+
+  (search (cons p0 nil) (cons (moves-from p0) nil)))
+
+
+(map (lambda (n) (print "Для поля " n "*" n ": " (knight n n 1 1) \n)) (range 1 11))
